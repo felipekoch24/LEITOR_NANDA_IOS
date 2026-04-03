@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIBLIOTECA ELITE - FERNANDA</title>
+    <title>LEITOR DE LIVROS DA NANDA</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Livros Fê">
+    <meta name="apple-mobile-web-app-title" content="Livros Nanda">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/ff79c6/282a36?text=N">
     
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
@@ -21,19 +22,22 @@
         header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ff79c6; width: 100%; padding-bottom: 15px; }
         h1 { color: #ff79c6; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; }
         
-        .upload-section { width: 100%; max-width: 500px; margin-bottom: 20px; }
+        .upload-section { width: 100%; max-width: 500px; margin-bottom: 25px; }
         #file-input { display: none; }
         .btn-local { 
             display: block; 
             background: linear-gradient(135deg, #ff79c6 0%, #bd93f9 100%);
             color: #282a36; 
             text-align: center; 
-            padding: 16px; border-radius: 15px; 
-            font-weight: bold; text-transform: uppercase; 
-            cursor: pointer; border: none; font-size: 12px;
-            box-shadow: 0 4px 15px rgba(255, 121, 198, 0.3);
+            padding: 20px; border-radius: 15px; 
+            font-weight: 900; text-transform: uppercase; 
+            cursor: pointer; border: none; font-size: 13px;
+            box-shadow: 0 4px 15px rgba(255, 121, 198, 0.4);
         }
-        .separador { color: #6272a4; font-size: 10px; margin: 15px 0; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .btn-local:active { transform: scale(0.97); }
+
+        .separador { color: #6272a4; font-size: 10px; margin: 15px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; }
+
         #lista-livros { width: 100%; max-width: 500px; display: grid; grid-template-columns: 1fr; gap: 12px; }
         
         .livro-card { 
@@ -41,32 +45,48 @@
             padding: 18px; display: flex; justify-content: space-between; align-items: center;
             text-decoration: none; transition: 0.2s;
         }
+        .livro-card:active { background: #6272a4; transform: scale(0.96); }
+
         .info-livro { flex: 1; padding-right: 10px; }
-        .titulo-livro { color: #f8f8f2; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+        .titulo-livro { color: #f8f8f2; font-weight: bold; font-size: 13px; text-transform: uppercase; line-height: 1.4; }
         .tipo-tag { font-size: 9px; background: #282a36; color: #ff79c6; padding: 3px 7px; border-radius: 5px; margin-top: 6px; display: inline-block; font-weight: bold; border: 1px solid #ff79c6; }
+
         .btn-ler { background: #ff79c6; color: #282a36; padding: 10px 18px; border-radius: 10px; font-weight: 800; font-size: 11px; text-transform: uppercase; }
+        
+        #status-offline {
+            display: none; background: #ff5555; color: white;
+            font-size: 10px; text-align: center; padding: 6px;
+            width: 100%; position: fixed; bottom: 0; left: 0;
+            text-transform: uppercase; font-weight: bold;
+        }
     </style>
 </head>
 <body>
+
     <header>
-        <h1>BIBLIOTECA ELITE</h1>
-        <p style="font-size: 10px; color: #6272a4; margin-top: 5px;">ACESSO EXCLUSIVO FERNANDA</p>
+        <h1>BIBLIOTECA DA NANDA</h1>
+        <p style="font-size: 10px; color: #6272a4; margin-top: 5px;">ESTUDO & ROMANCE • ELITE</p>
     </header>
 
     <div class="upload-section">
-        <label for="file-input" class="btn-local">📂 ABRIR DO MEU IPHONE / ANDROID</label>
+        <label for="file-input" class="btn-local">📂 LER LIVRO DO MEU IPHONE</label>
         <input type="file" id="file-input" accept=".pdf,.docx,.txt">
     </div>
 
     <div class="separador">--- ACERVO NA NUVEM ---</div>
-    <div id="lista-livros"></div>
+
+    <div id="lista-livros">
+        <p style="text-align:center; font-size:11px; color:#6272a4;">Sincronizando acervo...</p>
+    </div>
+
+    <div id="status-offline">MODO OFFLINE ATIVO</div>
 
     <script>
-        // CONFIGURAÇÃO DO GITHUB - COLOQUE SEUS DADOS AQUI
+        // MUDAR AQUI:
         const USUARIO = 'SEU_USUARIO'; 
         const REPOSITORIO = 'SEU_REPO'; 
 
-        // AJUSTE PARA ABRIR ARQUIVO LOCAL SEM SER BLOQUEADO
+        // ABRIR ARQUIVO LOCAL (IPHONE/ANDROID)
         document.getElementById('file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -74,29 +94,31 @@
                 reader.onload = function(event) {
                     const blob = new Blob([event.target.result], {type: file.type});
                     const url = URL.createObjectURL(blob);
-                    
-                    // Criamos um link invisível e clicamos nele para forçar a abertura
                     const a = document.createElement('a');
                     a.href = url;
                     a.target = '_blank';
                     a.click();
-                    
-                    // Limpa a memória depois de um tempo
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 };
                 reader.readAsArrayBuffer(file);
             }
         });
 
+        // CARREGAR ARQUIVOS DO GITHUB
         async function carregarNuvem() {
             const lista = document.getElementById('lista-livros');
+            if (!navigator.onLine) {
+                document.getElementById('status-offline').style.display = 'block';
+                lista.innerHTML = '<p style="text-align:center; font-size:12px; color:#6272a4;">Offline. Use o botão acima para ler arquivos locais.</p>';
+                return;
+            }
             try {
                 const res = await fetch(`https://api.github.com/repos/${USUARIO}/${REPOSITORIO}/contents/`);
                 const dados = await res.json();
                 lista.innerHTML = '';
                 const livros = dados.filter(f => {
                     const n = f.name.toLowerCase();
-                    return (n.endsWith('.pdf') || n.endsWith('.docx') || n.endsWith('.txt')) && n !== 'index.html';
+                    return (n.endsWith('.pdf') || n.endsWith('.docx') || n.endsWith('.txt')) && n !== 'index.html' && n !== 'sw.js';
                 });
                 livros.forEach(l => {
                     const ext = l.name.split('.').pop().toUpperCase();
@@ -111,11 +133,12 @@
                         </a>`;
                 });
             } catch (e) {
-                lista.innerHTML = '<p style="color:#ff5555; font-size:11px">Erro na nuvem.</p>';
+                lista.innerHTML = '<p style="color:#ff5555; font-size:11px; text-align:center;">Erro ao conectar com a nuvem.</p>';
             }
         }
+
         carregarNuvem();
-        
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js');
         }
