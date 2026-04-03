@@ -6,43 +6,43 @@
     <title>BIBLIOTECA DA NANDA</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #282a36; color: #f8f8f2; font-family: -apple-system, system-ui, sans-serif; overflow-x: hidden; }
+        body { background-color: #282a36; color: #f8f8f2; font-family: -apple-system, system-ui, sans-serif; overflow: hidden; }
         
-        /* TELA DE SELEÇÃO */
-        #main-screen { padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ff79c6; width: 100%; padding-bottom: 15px; }
-        h1 { color: #ff79c6; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; }
+        /* TELA DE ESCOLHA */
+        #main-screen { padding: 20px; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow-y: auto; }
+        header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ff79c6; width: 100%; padding-bottom: 15px; }
+        h1 { color: #ff79c6; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
         
         .btn-upload { 
             width: 100%; max-width: 400px; background: linear-gradient(135deg, #ff79c6 0%, #bd93f9 100%);
-            color: #282a36; text-align: center; padding: 20px; border-radius: 15px; 
-            font-weight: 900; text-transform: uppercase; cursor: pointer; margin-bottom: 25px; 
-            box-shadow: 0 4px 15px rgba(255, 121, 198, 0.3);
+            color: #282a36; text-align: center; padding: 18px; border-radius: 15px; 
+            font-weight: 900; text-transform: uppercase; cursor: pointer; margin-bottom: 20px;
         }
 
-        .lista { width: 100%; max-width: 400px; display: grid; gap: 12px; }
+        .lista { width: 100%; max-width: 400px; display: grid; gap: 10px; }
         .item-livro { 
-            background: #44475a; border-radius: 12px; padding: 18px; 
-            display: flex; justify-content: space-between; align-items: center; 
-            border: 1px solid #6272a4; transition: 0.2s;
+            background: #44475a; border-radius: 12px; padding: 15px; 
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+            border: 1px solid #6272a4;
         }
-        .item-livro:active { transform: scale(0.97); background: #6272a4; }
 
-        /* LEITOR EM TELA CHEIA (ESTILO APP) */
-        #reader-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #191a21; z-index: 1000; flex-direction: column; }
-        .nav-bar { height: 65px; background: #282a36; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid #44475a; }
+        /* TELA DO LEITOR (ESTILO PLAY LIVROS) */
+        #reader-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fdf6e3; z-index: 1000; flex-direction: column; }
+        #viewer { flex: 1; width: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        canvas { max-width: 100% !important; height: auto !important; margin-bottom: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         
-        #pdf-viewer-container { 
-            flex: 1; width: 100%; overflow-y: auto; background: #fdf6e3; /* Cor Sépia suave */
-            display: flex; flex-direction: column; align-items: center;
-        }
-        canvas { max-width: 100%; height: auto !important; margin-bottom: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
-
-        .btn-close { background: #ff5555; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; font-size: 11px; }
-        .page-info { color: #ff79c6; font-size: 11px; font-weight: bold; }
+        .nav-bar { height: 60px; background: #282a36; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; }
+        .btn-nav { background: #ff79c6; color: #282a36; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+        .btn-close { background: #ff5555; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        
+        /* Texto para DOCX e TXT */
+        #text-content { padding: 30px; color: #333; line-height: 1.6; font-size: 18px; max-width: 600px; }
     </style>
 </head>
 <body>
@@ -50,56 +50,95 @@
     <div id="main-screen">
         <header>
             <h1>BIBLIOTECA DA NANDA</h1>
-            <p style="font-size: 10px; color: #6272a4; margin-top: 5px;">MODO LEITURA INTELIGENTE</p>
+            <p style="font-size: 10px; color: #6272a4;">LEITOR ELITE • MULTIFORMATO</p>
         </header>
 
-        <label for="file-input" class="btn-upload">📂 LER PDF DO DISPOSITIVO</label>
-        <input type="file" id="file-input" style="display:none" accept=".pdf">
+        <label for="file-input" class="btn-upload">📂 ABRIR LIVRO DO IPHONE</label>
+        <input type="file" id="file-input" style="display:none" accept=".epub,.pdf,.docx,.txt">
 
         <div class="lista" id="lista-nuvem">
-            <p style="text-align:center; font-size:11px; color:#6272a4;">Sincronizando acervo...</p>
+            <p style="text-align:center; font-size:11px; color:#6272a4;">Buscando livros na nuvem...</p>
         </div>
     </div>
 
     <div id="reader-screen">
         <div class="nav-bar">
             <button class="btn-close" onclick="closeReader()">FECHAR</button>
-            <div class="page-info" id="page-num">LENDO...</div>
-            <div style="width: 50px;"></div> </div>
-        <div id="pdf-viewer-container"></div>
+            <div id="epub-ctrls" style="display:none; gap:10px;">
+                <button class="btn-nav" onclick="prevPage()"> ← </button>
+                <button class="btn-nav" onclick="nextPage()"> → </button>
+            </div>
+        </div>
+        <div id="viewer"></div>
     </div>
 
     <script>
         const USER = 'felipekoch24';
         const REPO = 'LEITOR_NANDA_IOS';
+        let rendition;
+        
+        // Configura o motor do PDF
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        async function openPdf(url) {
+        async function openBook(url, name) {
+            const ext = name.split('.').pop().toLowerCase();
             document.getElementById('main-screen').style.display = 'none';
             document.getElementById('reader-screen').style.display = 'flex';
-            const container = document.getElementById('pdf-viewer-container');
-            container.innerHTML = "";
-
-            const loadingTask = pdfjsLib.getDocument(url);
-            const pdf = await loadingTask.promise;
+            const viewer = document.getElementById('viewer');
+            const ctrls = document.getElementById('epub-ctrls');
             
-            // Renderiza todas as páginas uma embaixo da outra para scroll infinito
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1.5 }); // Escala maior para nitidez
-                
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+            viewer.innerHTML = "";
+            ctrls.style.display = "none";
+            viewer.scrollTop = 0;
 
-                const renderContext = { canvasContext: context, viewport: viewport };
-                await page.render(renderContext).promise;
-                container.appendChild(canvas);
+            // --- LÓGICA EPUB ---
+            if (ext === 'epub') {
+                ctrls.style.display = "flex";
+                const book = ePub(url);
+                rendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "paginated" });
+                
+                const savedPos = localStorage.getItem('pos_' + name);
+                rendition.display(savedPos || undefined);
+                
+                rendition.on("relocated", (loc) => {
+                    localStorage.setItem('pos_' + name, loc.start.cfi);
+                });
+            } 
+            // --- LÓGICA PDF ---
+            else if (ext === 'pdf') {
+                const loadingTask = pdfjsLib.getDocument(url);
+                const pdf = await loadingTask.promise;
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    viewer.appendChild(canvas);
+                }
+                
+                const savedScroll = localStorage.getItem('scroll_' + name);
+                if (savedScroll) viewer.scrollTop = savedScroll;
+                
+                viewer.onscroll = () => {
+                    localStorage.setItem('scroll_' + name, viewer.scrollTop);
+                };
             }
-            document.getElementById('page-num').innerText = pdf.numPages + " PÁGINAS";
+            // --- LÓGICA DOCX ---
+            else if (ext === 'docx') {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+                viewer.innerHTML = `<div id="text-content">${result.value}</div>`;
+            }
         }
 
+        function nextPage() { if(rendition) rendition.next(); }
+        function prevPage() { if(rendition) rendition.prev(); }
+        
         function closeReader() {
             document.getElementById('main-screen').style.display = 'flex';
             document.getElementById('reader-screen').style.display = 'none';
@@ -108,32 +147,29 @@
         async function fetchBooks() {
             const container = document.getElementById('lista-nuvem');
             try {
-                const response = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
-                const files = await response.json();
+                const res = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
+                const files = await res.json();
                 container.innerHTML = '';
-                
-                files.forEach(file => {
-                    if (file.name.toLowerCase().endsWith('.pdf')) {
-                        const title = file.name.split('.')[0].replace(/_/g, ' ').replace(/-/g, ' ');
+                files.forEach(f => {
+                    const ext = f.name.toLowerCase().split('.').pop();
+                    if (['pdf','epub','docx','txt'].includes(ext)) {
+                        const title = f.name.split('.')[0].replace(/_/g, ' ');
                         container.innerHTML += `
-                            <div class="item-livro" onclick="openPdf('${file.download_url}')">
+                            <div class="item-livro" onclick="openBook('${f.download_url}', '${f.name}')">
                                 <div>
-                                    <div style="font-weight:bold; font-size:13px;">${title}</div>
-                                    <div style="font-size:9px; color:#ff79c6">PDF OTIMIZADO</div>
+                                    <b style="font-size:13px">${title}</b><br>
+                                    <small style="color:#ff79c6">${ext.toUpperCase()}</small>
                                 </div>
-                                <div style="color:#ff79c6; font-weight:bold; font-size:12px;">LER</div>
+                                <b style="color:#ff79c6">LER ></b>
                             </div>`;
                     }
                 });
-            } catch (e) { container.innerHTML = '<p>Erro ao carregar nuvem.</p>'; }
+            } catch (e) { container.innerHTML = 'Erro ao carregar acervo.'; }
         }
 
         document.getElementById('file-input').addEventListener('change', e => {
             const file = e.target.files[0];
-            if (file) {
-                const url = URL.createObjectURL(file);
-                openPdf(url);
-            }
+            if (file) openBook(URL.createObjectURL(file), file.name);
         });
 
         fetchBooks();
