@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LEITOR DE LIVROS DA NANDA</title>
+    <title>BIBLIOTECA DA NANDA</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Livros Nanda">
+    <meta name="apple-mobile-web-app-title" content="Nanda Livros">
     <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/ff79c6/282a36?text=N">
     
     <style>
@@ -57,7 +57,7 @@
             display: none; background: #ff5555; color: white;
             font-size: 10px; text-align: center; padding: 6px;
             width: 100%; position: fixed; bottom: 0; left: 0;
-            text-transform: uppercase; font-weight: bold;
+            text-transform: uppercase; font-weight: bold; z-index: 100;
         }
     </style>
 </head>
@@ -82,11 +82,11 @@
     <div id="status-offline">MODO OFFLINE ATIVO</div>
 
     <script>
-        // MUDAR AQUI:
-        const USUARIO = 'SEU_USUARIO'; 
-        const REPOSITORIO = 'SEU_REPO'; 
+        // CONFIGURAÇÃO BASEADA NO SEU PRINT:
+        const USUARIO = 'felipekoch24'; 
+        const REPOSITORIO = 'LEITOR_NANDA_IOS'; 
 
-        // ABRIR ARQUIVO LOCAL (IPHONE/ANDROID)
+        // LÓGICA PARA ABRIR ARQUIVO LOCAL (CORRIGIDA)
         document.getElementById('file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -104,22 +104,30 @@
             }
         });
 
-        // CARREGAR ARQUIVOS DO GITHUB
+        // BUSCAR LIVROS NO GITHUB
         async function carregarNuvem() {
             const lista = document.getElementById('lista-livros');
             if (!navigator.onLine) {
                 document.getElementById('status-offline').style.display = 'block';
-                lista.innerHTML = '<p style="text-align:center; font-size:12px; color:#6272a4;">Offline. Use o botão acima para ler arquivos locais.</p>';
+                lista.innerHTML = '<p style="text-align:center; font-size:11px; color:#6272a4;">Você está offline.</p>';
                 return;
             }
             try {
                 const res = await fetch(`https://api.github.com/repos/${USUARIO}/${REPOSITORIO}/contents/`);
                 const dados = await res.json();
                 lista.innerHTML = '';
+                
                 const livros = dados.filter(f => {
                     const n = f.name.toLowerCase();
-                    return (n.endsWith('.pdf') || n.endsWith('.docx') || n.endsWith('.txt')) && n !== 'index.html' && n !== 'sw.js';
+                    return (n.endsWith('.pdf') || n.endsWith('.docx') || n.endsWith('.txt')) 
+                           && n !== 'index.html' && n !== 'sw.js';
                 });
+
+                if(livros.length === 0) {
+                    lista.innerHTML = '<p style="text-align:center; font-size:11px; color:#6272a4;">Nenhum livro na nuvem ainda.</p>';
+                    return;
+                }
+
                 livros.forEach(l => {
                     const ext = l.name.split('.').pop().toUpperCase();
                     const nome = l.name.substring(0, l.name.lastIndexOf('.')).replace(/_/g, ' ').replace(/-/g, ' ');
@@ -133,12 +141,13 @@
                         </a>`;
                 });
             } catch (e) {
-                lista.innerHTML = '<p style="color:#ff5555; font-size:11px; text-align:center;">Erro ao conectar com a nuvem.</p>';
+                lista.innerHTML = '<p style="color:#ff5555; font-size:11px; text-align:center;">Erro ao carregar nuvem.</p>';
             }
         }
 
         carregarNuvem();
 
+        // REGISTRO PARA FUNCIONAR OFFLINE
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js');
         }
