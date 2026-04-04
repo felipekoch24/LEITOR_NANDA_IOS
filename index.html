@@ -41,7 +41,6 @@ body{background:#282a36;color:#fff;font-family:sans-serif;overflow:hidden;}
 <div id="reader-screen">
 <div class="nav-bar">
 <button class="btn" onclick="closeReader()">FECHAR</button>
-<button class="btn" id="btn-audio" onclick="toggleAudio()">🔊 OUVIR</button>
 </div>
 
 <div id="viewer"></div>
@@ -56,9 +55,9 @@ body{background:#282a36;color:#fff;font-family:sans-serif;overflow:hidden;}
 const USER='felipekoch24';
 const REPO='LEITOR_NANDA_IOS';
 
-let rendition,currentBook,isReading=false;
+let rendition,currentBook,currentBookName="";
 
-// ===== SWIPE =====
+// ===== SWIPE (CELULAR) =====
 let startX=0;
 
 document.addEventListener('touchstart',e=>{
@@ -67,98 +66,26 @@ document.addEventListener('touchstart',e=>{
 
 document.addEventListener('touchend',e=>{
  let diff=startX-e.changedTouches[0].clientX;
+
  if(Math.abs(diff)>50){
-   if(diff>0) next();
-   else prev();
+  if(diff>0) next();
+  else prev();
  }
 });
 
 // ===== TECLADO (NOTEBOOK) =====
 document.addEventListener("keydown",(e)=>{
  if(document.getElementById('reader-screen').style.display!=='flex') return;
+
  if(e.key==="ArrowRight") next();
  if(e.key==="ArrowLeft") prev();
 });
 
-// ===== ÁUDIO =====
-let utterQueue=[];
-let speakingIndex=0;
-
-speechSynthesis.onvoiceschanged=()=>{};
-
-function splitText(text,size=120){
- let chunks=[];
- for(let i=0;i<text.length;i+=size){
-  chunks.push(text.slice(i,i+size));
- }
- return chunks;
-}
-
-function getVoice(){
- let voices=speechSynthesis.getVoices();
- return voices.find(v=>v.lang.includes("pt"))||voices[0];
-}
-
-function speakQueue(){
- if(speakingIndex>=utterQueue.length){
-  isReading=false;
-  document.getElementById('btn-audio').innerText="🔊 OUVIR";
-  return;
- }
-
- let u=utterQueue[speakingIndex];
-
- u.onend=()=>{
-  speakingIndex++;
-  speakQueue();
- };
-
- speechSynthesis.speak(u);
-}
-
-function toggleAudio(){
- if(isReading){
-  speechSynthesis.cancel();
-  isReading=false;
-  document.getElementById('btn-audio').innerText="🔊 OUVIR";
-  return;
- }
-
- let loc=rendition.currentLocation();
- let section=currentBook.spine.get(loc.start.cfi);
-
- section.load(currentBook.load.bind(currentBook)).then(doc=>{
-
-  let text=doc.documentElement.innerText;
-  text=text.replace(/\s+/g," ").trim();
-
-  if(!text){
-   alert("Sem texto nessa página");
-   return;
-  }
-
-  let parts=splitText(text,120);
-  let voice=getVoice();
-
-  utterQueue=parts.map(p=>{
-   let u=new SpeechSynthesisUtterance(p);
-   u.lang="pt-BR";
-   u.rate=0.9;
-   if(voice) u.voice=voice;
-   return u;
-  });
-
-  speakingIndex=0;
-  isReading=true;
-  document.getElementById('btn-audio').innerText="⏹ PARAR";
-
-  speechSynthesis.cancel();
-  setTimeout(()=>speakQueue(),200);
- });
-}
-
-// ===== LIVRO =====
+// ===== ABRIR LIVRO =====
 async function openBook(url,name){
+
+ currentBookName=name;
+
  document.getElementById('main-screen').style.display='none';
  document.getElementById('reader-screen').style.display='flex';
 
@@ -179,26 +106,31 @@ async function openBook(url,name){
   "div":{"font-size":"36px"}
  });
 
- await rendition.display();
+ // recuperar posição salva
+ let saved=localStorage.getItem("pos_"+name);
+
+ await rendition.display(saved || undefined);
+
+ // salvar progresso automático
+ rendition.on("relocated",loc=>{
+  localStorage.setItem("pos_"+name,loc.start.cfi);
+ });
 }
 
 // ===== NAV =====
 function next(){
- speechSynthesis.cancel();
  rendition.next();
 }
 
 function prev(){
- speechSynthesis.cancel();
  rendition.prev();
 }
 
 function closeReader(){
- speechSynthesis.cancel();
  location.reload();
 }
 
-// ===== LISTA =====
+// ===== LISTA DE LIVROS =====
 async function fetchBooks(){
  let res=await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
  let files=await res.json();
