@@ -1,167 +1,225 @@
 <!DOCTYPE html>
+
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIBLIOTECA DA NANDA</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIBLIOTECA DA NANDA PRO</title>
 
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background-color: #282a36; color: #f8f8f2; font-family: -apple-system, sans-serif; overflow: hidden; }
-        
-        #main-screen { padding: 20px; height: 100vh; overflow-y: auto; }
-        header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ff79c6; padding-bottom: 15px; }
-        .btn-upload { width: 100%; background: #ff79c6; color: #282a36; text-align: center; padding: 20px; border-radius: 15px; font-weight: 900; cursor: pointer; display: block; margin-bottom: 20px; border: none; font-size: 18px; }
-        .item-livro { background: #44475a; border-radius: 12px; padding: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-left: 5px solid #ff79c6; }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 
-        #reader-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fdf6e3; z-index: 1000; flex-direction: column; }
-        .nav-bar { height: 60px; background: #282a36; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; z-index: 1010; }
-        
-        #viewer { flex: 1; width: 100%; position: relative; z-index: 1001; }
-        #touch-layer { position: absolute; top: 60px; bottom: 100px; left: 0; right: 0; z-index: 1005; background: transparent; }
+<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 
-        .footer-nav { height: 100px; background: #282a36; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1010; padding-bottom: 10px; }
-        .pages-info { color: #ff79c6; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
-        .controls { display: flex; gap: 40px; width: 100%; justify-content: center; }
+<style>
+body { margin:0; font-family:sans-serif; background:#282a36; color:#fff; }
 
-        .btn { border: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 12px; color: white; cursor: pointer; }
-        .btn-close { background: #ff5555; }
-        .btn-audio { background: #50fa7b; color: #282a36; min-width: 100px; font-size: 14px; }
-        .btn-page { background: #6272a4; padding: 12px 45px; font-size: 25px; border-radius: 15px; }
-    </style>
+#main { padding:20px; }
+.book { background:#444; padding:15px; margin:10px 0; border-radius:10px; cursor:pointer; }
+
+#reader { display:none; position:fixed; inset:0; background:#fff; color:#000; }
+
+.top { height:60px; background:#222; display:flex; align-items:center; justify-content:space-between; padding:10px; }
+.btn { padding:10px; border:none; border-radius:8px; cursor:pointer; }
+
+#viewer { height:calc(100% - 140px); }
+
+.bottom { height:80px; background:#222; display:flex; justify-content:center; gap:10px; align-items:center; }
+
+.night { background:#111 !important; color:#eee !important; }
+.highlight { background:yellow; }
+</style>
+
 </head>
+
 <body>
 
-    <div id="main-screen">
-        <header><h1>BIBLIOTECA DA NANDA</h1></header>
-        <label for="file-input" class="btn-upload">📂 ABRIR LIVRO (.EPUB)</label>
-        <input type="file" id="file-input" style="display:none" accept=".epub">
-        <div id="lista-nuvem">Carregando seus livros...</div>
-    </div>
+<div id="main">
+<h2>BIBLIOTECA</h2>
+<div id="books"></div>
+</div>
 
-    <div id="reader-screen">
-        <div class="nav-bar">
-            <button class="btn btn-close" onclick="closeReader()">FECHAR</button>
-            <button class="btn btn-audio" id="btn-audio" onclick="toggleAudio()">🔊 OUVIR</button>
-        </div>
-        
-        <div id="touch-layer"></div>
-        <div id="viewer"></div>
+<div id="reader">
+<div class="top">
+<button class="btn" onclick="closeReader()">FECHAR</button>
+<button class="btn" onclick="toggleAudio()">🔊</button>
+<button class="btn" onclick="toggleNight()">🌙</button>
+</div>
 
-        <div class="footer-nav">
-            <div class="pages-info" id="page-counter">Página -- de --</div>
-            <div class="controls">
-                <button class="btn btn-page" onclick="prev()">⬅</button>
-                <button class="btn btn-page" onclick="next()">➡</button>
-            </div>
-        </div>
-    </div>
+<div id="viewer"></div>
 
-    <script>
-        const USER = 'felipekoch24', REPO = 'LEITOR_NANDA_IOS';
-        let rendition, currentBook, isReading = false;
-        let startX = 0;
+<div class="bottom">
+<button class="btn" onclick="prev()">⬅</button>
+<button class="btn" onclick="next()">➡</button>
+<button class="btn" onclick="skipParagraph()">⏩ P</button>
+<button class="btn" onclick="nextChapter()">📖 ➡</button>
+</div>
+</div>
 
-        async function openBook(url, name) {
-            document.getElementById('main-screen').style.display = 'none';
-            document.getElementById('reader-screen').style.display = 'flex';
-            
-            if(currentBook) currentBook.destroy();
-            
-            currentBook = ePub(url);
-            rendition = currentBook.renderTo("viewer", {
-                width: "100%", height: "100%", flow: "paginated", manager: "default"
-            });
+<script>
+const USER = 'felipekoch24';
+const REPO = 'LEITOR_NANDA_IOS';
+const TOKEN = ''; // opcional GitHub token
 
-            // Letra Ultra Gigante (32px) e espaçamento para facilitar leitura
-            rendition.themes.default({
-                "body": { "padding": "15px !important" },
-                "p": { "font-size": "32px !important", "line-height": "1.4 !important", "color": "#000 !important", "margin-bottom": "20px !important" },
-                "div": { "font-size": "32px !important" }
-            });
+let book, rendition;
+let currentBookName = "";
+let utterances = [], index = 0, isReading=false;
 
-            const savedPos = localStorage.getItem('pos_' + name);
-            await rendition.display(savedPos || undefined);
+// ================= LIVROS =================
+async function loadBooks(){
+ const res = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
+ const data = await res.json();
 
-            currentBook.ready.then(() => {
-                return currentBook.locations.generate(1000);
-            }).then(() => updateProgress(name));
+ const container = document.getElementById('books');
+ data.forEach(f=>{
+  if(f.name.endsWith('.epub')){
+    container.innerHTML += `<div class="book" onclick="openBook('${f.download_url}','${f.name}')">${f.name}</div>`;
+  }
+ });
+}
 
-            rendition.on("relocated", () => updateProgress(name));
-        }
+// ================= ABRIR =================
+async function openBook(url,name){
+ currentBookName = name;
 
-        function updateProgress(name) {
-            if (rendition && rendition.currentLocation()) {
-                const loc = rendition.currentLocation();
-                const cur = loc.start.displayed.page;
-                const total = loc.start.displayed.total;
-                document.getElementById('page-counter').innerText = `Página ${cur} de ${total}`;
-                if(name) localStorage.setItem('pos_' + name, loc.start.cfi);
-            }
-        }
+ document.getElementById('main').style.display='none';
+ document.getElementById('reader').style.display='block';
 
-        const touchLayer = document.getElementById('touch-layer');
-        touchLayer.addEventListener('touchstart', e => startX = e.touches[0].clientX);
-        touchLayer.addEventListener('touchend', e => {
-            const diff = startX - e.changedTouches[0].clientX;
-            if (Math.abs(diff) > 50) {
-                if (diff > 0) next(); else prev();
-            }
-        });
+ book = ePub(url);
+ rendition = book.renderTo("viewer",{width:"100%",height:"100%"});
 
-        function next() { window.speechSynthesis.cancel(); rendition.next(); }
-        function prev() { window.speechSynthesis.cancel(); rendition.prev(); }
+ const pos = await loadCloud(name);
+ rendition.display(pos || undefined);
 
-        // SISTEMA DE ÁUDIO REFORÇADO
-        function toggleAudio() {
-            if (isReading) { 
-                window.speechSynthesis.cancel(); 
-                isReading = false; 
-                document.getElementById('btn-audio').innerText = "🔊 OUVIR";
-                return; 
-            }
-            
-            const loc = rendition.currentLocation();
-            const section = currentBook.spine.get(loc.start.cfi);
-            
-            section.load(currentBook.load.bind(currentBook)).then(doc => {
-                const text = doc.body.innerText || doc.body.textContent;
-                const utter = new SpeechSynthesisUtterance(text.trim());
-                utter.lang = 'pt-BR';
-                utter.rate = 0.9; // Um pouco mais lento para clareza
-                
-                utter.onstart = () => {
-                    isReading = true;
-                    document.getElementById('btn-audio').innerText = "⏹ PARAR";
-                };
-                utter.onend = () => {
-                    isReading = false;
-                    document.getElementById('btn-audio').innerText = "🔊 OUVIR";
-                };
-                
-                window.speechSynthesis.speak(utter);
-            });
-        }
+ rendition.on("relocated", loc=>{
+   saveCloud(name, loc.start.cfi);
+ });
+}
 
-        function closeReader() { window.speechSynthesis.cancel(); location.reload(); }
+// ================= NAVEGAÇÃO =================
+function next(){ speechSynthesis.cancel(); rendition.next(); }
+function prev(){ speechSynthesis.cancel(); rendition.prev(); }
 
-        async function fetchBooks() {
-            try {
-                const res = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
-                const files = await res.json();
-                const container = document.getElementById('lista-nuvem');
-                container.innerHTML = '';
-                files.forEach(f => {
-                    if (f.name.toLowerCase().endsWith('.epub')) {
-                        container.innerHTML += `<div class="item-livro" onclick="openBook('${f.download_url}', '${f.name}')"><b>${f.name.replace('.epub', '')}</b><span>LER</span></div>`;
-                    }
-                });
-            } catch(e) { console.log("Erro na lista"); }
-        }
-        fetchBooks();
-    </script>
+function nextChapter(){
+ speechSynthesis.cancel();
+ book.spine.get(book.spine.pos + 1).load(book.load.bind(book)).then(()=>{
+   rendition.display(book.spine.get(book.spine.pos + 1).href);
+ });
+}
+
+// pular parágrafo
+function skipParagraph(){
+ speechSynthesis.cancel();
+ index += 5;
+ speakNext();
+}
+
+// ================= ÁUDIO =================
+function splitText(text){
+ return text.match(/.{1,200}/g);
+}
+
+function getVoice(){
+ return speechSynthesis.getVoices().find(v=>v.lang.includes('pt')) || speechSynthesis.getVoices()[0];
+}
+
+function speakNext(){
+ if(index>=utterances.length){
+   isReading=false;
+   return;
+ }
+
+ let u = utterances[index];
+
+ u.onend=()=>{
+   index++;
+   localStorage.setItem("audio_"+currentBookName,index);
+   speakNext();
+ };
+
+ speechSynthesis.speak(u);
+}
+
+function toggleAudio(){
+ if(isReading){
+   speechSynthesis.cancel();
+   isReading=false;
+   return;
+ }
+
+ const loc = rendition.currentLocation();
+ const section = book.spine.get(loc.start.cfi);
+
+ section.load(book.load.bind(book)).then(doc=>{
+   const text = doc.body.innerText;
+
+   const parts = splitText(text);
+   const voice = getVoice();
+
+   utterances = parts.map(p=>{
+     let u = new SpeechSynthesisUtterance(p);
+     u.lang='pt-BR';
+     u.rate=0.85;
+     u.pitch=1.1;
+     u.voice=voice;
+     return u;
+   });
+
+   index = parseInt(localStorage.getItem("audio_"+currentBookName)) || 0;
+   isReading=true;
+
+   speakNext();
+ });
+}
+
+// ================= MODO NOTURNO =================
+function toggleNight(){
+ document.getElementById('reader').classList.toggle('night');
+ localStorage.setItem('night',document.getElementById('reader').classList.contains('night'));
+}
+
+window.onload=()=>{
+ if(localStorage.getItem('night')==='true'){
+   document.getElementById('reader').classList.add('night');
+ }
+};
+
+// ================= CLOUD (GitHub) =================
+async function saveCloud(name,pos){
+ if(!TOKEN) return;
+
+ const content = btoa(JSON.stringify({pos}));
+
+ await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/progress_${name}.json`,{
+  method:'PUT',
+  headers:{
+    Authorization:`token ${TOKEN}`,
+    'Content-Type':'application/json'
+  },
+  body:JSON.stringify({
+    message:'save progress',
+    content
+  })
+ });
+}
+
+async function loadCloud(name){
+ try{
+  const res = await fetch(`https://raw.githubusercontent.com/${USER}/${REPO}/main/progress_${name}.json`);
+  const data = await res.json();
+  return data.pos;
+ }catch(e){
+  return null;
+ }
+}
+
+// ================= FECHAR =================
+function closeReader(){
+ speechSynthesis.cancel();
+ location.reload();
+}
+
+loadBooks();
+</script>
+
 </body>
 </html>
