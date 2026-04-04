@@ -4,221 +4,280 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BIBLIOTECA DA NANDA PRO</title>
+<title>BIBLIOTECA DA NANDA</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 
 <style>
-body { margin:0; font-family:sans-serif; background:#282a36; color:#fff; }
+* { box-sizing:border-box; margin:0; padding:0; }
 
-#main { padding:20px; }
-.book { background:#444; padding:15px; margin:10px 0; border-radius:10px; cursor:pointer; }
+body {
+    background:#282a36;
+    color:#fff;
+    font-family:sans-serif;
+    overflow:hidden;
+}
 
-#reader { display:none; position:fixed; inset:0; background:#fff; color:#000; }
+#main-screen {
+    padding:20px;
+    height:100vh;
+    overflow:auto;
+}
 
-.top { height:60px; background:#222; display:flex; align-items:center; justify-content:space-between; padding:10px; }
-.btn { padding:10px; border:none; border-radius:8px; cursor:pointer; }
+header {
+    text-align:center;
+    margin-bottom:20px;
+}
 
-#viewer { height:calc(100% - 140px); }
+.btn-upload {
+    display:block;
+    width:100%;
+    padding:20px;
+    background:#ff79c6;
+    border:none;
+    border-radius:12px;
+    font-weight:bold;
+    cursor:pointer;
+}
 
-.bottom { height:80px; background:#222; display:flex; justify-content:center; gap:10px; align-items:center; }
+.item-livro {
+    background:#444;
+    padding:15px;
+    margin:10px 0;
+    border-radius:10px;
+    cursor:pointer;
+}
 
-.night { background:#111 !important; color:#eee !important; }
-.highlight { background:yellow; }
+#reader-screen {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:#fdf6e3;
+    flex-direction:column;
+}
+
+.nav-bar {
+    height:60px;
+    background:#282a36;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px;
+}
+
+#viewer {
+    flex:1;
+}
+
+#touch-layer {
+    position:absolute;
+    top:60px;
+    bottom:100px;
+    left:0;
+    right:0;
+}
+
+.footer-nav {
+    height:100px;
+    background:#282a36;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:20px;
+}
+
+.btn {
+    padding:10px 20px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.btn-page {
+    font-size:25px;
+}
+
 </style>
 
 </head>
 
 <body>
 
-<div id="main">
-<h2>BIBLIOTECA</h2>
-<div id="books"></div>
+<div id="main-screen">
+<header><h1>BIBLIOTECA DA NANDA</h1></header>
+<input type="file" id="file-input" style="display:none" accept=".epub">
+<div id="lista-nuvem"></div>
 </div>
 
-<div id="reader">
-<div class="top">
+<div id="reader-screen">
+<div class="nav-bar">
 <button class="btn" onclick="closeReader()">FECHAR</button>
-<button class="btn" onclick="toggleAudio()">🔊</button>
-<button class="btn" onclick="toggleNight()">🌙</button>
+<button class="btn" id="btn-audio" onclick="toggleAudio()">🔊 OUVIR</button>
 </div>
 
+<div id="touch-layer"></div>
 <div id="viewer"></div>
 
-<div class="bottom">
-<button class="btn" onclick="prev()">⬅</button>
-<button class="btn" onclick="next()">➡</button>
-<button class="btn" onclick="skipParagraph()">⏩ P</button>
-<button class="btn" onclick="nextChapter()">📖 ➡</button>
+<div class="footer-nav">
+<button class="btn btn-page" onclick="prev()">⬅</button>
+<button class="btn btn-page" onclick="next()">➡</button>
 </div>
 </div>
 
 <script>
 const USER = 'felipekoch24';
 const REPO = 'LEITOR_NANDA_IOS';
-const TOKEN = ''; // opcional GitHub token
 
-let book, rendition;
-let currentBookName = "";
-let utterances = [], index = 0, isReading=false;
+let rendition, currentBook, isReading=false;
+let startX=0;
 
-// ================= LIVROS =================
-async function loadBooks(){
- const res = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
- const data = await res.json();
+// ===== AUDIO =====
+let utterQueue = [];
+let speakingIndex = 0;
 
- const container = document.getElementById('books');
- data.forEach(f=>{
-  if(f.name.endsWith('.epub')){
-    container.innerHTML += `<div class="book" onclick="openBook('${f.download_url}','${f.name}')">${f.name}</div>`;
-  }
- });
-}
+speechSynthesis.onvoiceschanged = () => {};
 
-// ================= ABRIR =================
-async function openBook(url,name){
- currentBookName = name;
-
- document.getElementById('main').style.display='none';
- document.getElementById('reader').style.display='block';
-
- book = ePub(url);
- rendition = book.renderTo("viewer",{width:"100%",height:"100%"});
-
- const pos = await loadCloud(name);
- rendition.display(pos || undefined);
-
- rendition.on("relocated", loc=>{
-   saveCloud(name, loc.start.cfi);
- });
-}
-
-// ================= NAVEGAÇÃO =================
-function next(){ speechSynthesis.cancel(); rendition.next(); }
-function prev(){ speechSynthesis.cancel(); rendition.prev(); }
-
-function nextChapter(){
- speechSynthesis.cancel();
- book.spine.get(book.spine.pos + 1).load(book.load.bind(book)).then(()=>{
-   rendition.display(book.spine.get(book.spine.pos + 1).href);
- });
-}
-
-// pular parágrafo
-function skipParagraph(){
- speechSynthesis.cancel();
- index += 5;
- speakNext();
-}
-
-// ================= ÁUDIO =================
-function splitText(text){
- return text.match(/.{1,200}/g);
+function splitText(text, size=120){
+    const chunks=[];
+    for(let i=0;i<text.length;i+=size){
+        chunks.push(text.slice(i,i+size));
+    }
+    return chunks;
 }
 
 function getVoice(){
- return speechSynthesis.getVoices().find(v=>v.lang.includes('pt')) || speechSynthesis.getVoices()[0];
+    const voices = speechSynthesis.getVoices();
+    return voices.find(v=>v.lang.includes("pt")) || voices[0];
 }
 
-function speakNext(){
- if(index>=utterances.length){
-   isReading=false;
-   return;
- }
+function speakQueue(){
+    if(speakingIndex>=utterQueue.length){
+        isReading=false;
+        document.getElementById('btn-audio').innerText="🔊 OUVIR";
+        return;
+    }
 
- let u = utterances[index];
+    const utter = utterQueue[speakingIndex];
 
- u.onend=()=>{
-   index++;
-   localStorage.setItem("audio_"+currentBookName,index);
-   speakNext();
- };
+    utter.onend=()=>{
+        speakingIndex++;
+        speakQueue();
+    };
 
- speechSynthesis.speak(u);
+    speechSynthesis.speak(utter);
 }
 
 function toggleAudio(){
- if(isReading){
-   speechSynthesis.cancel();
-   isReading=false;
-   return;
- }
+    if(isReading){
+        speechSynthesis.cancel();
+        isReading=false;
+        document.getElementById('btn-audio').innerText="🔊 OUVIR";
+        return;
+    }
 
- const loc = rendition.currentLocation();
- const section = book.spine.get(loc.start.cfi);
+    const loc = rendition.currentLocation();
+    const section = currentBook.spine.get(loc.start.cfi);
 
- section.load(book.load.bind(book)).then(doc=>{
-   const text = doc.body.innerText;
+    section.load(currentBook.load.bind(currentBook)).then(doc=>{
+        let text = doc.body.innerText || doc.body.textContent;
+        text = text.replace(/\s+/g," ").trim();
 
-   const parts = splitText(text);
-   const voice = getVoice();
+        const parts = splitText(text,120);
+        const voice = getVoice();
 
-   utterances = parts.map(p=>{
-     let u = new SpeechSynthesisUtterance(p);
-     u.lang='pt-BR';
-     u.rate=0.85;
-     u.pitch=1.1;
-     u.voice=voice;
-     return u;
-   });
+        utterQueue = parts.map(p=>{
+            const u = new SpeechSynthesisUtterance(p);
+            u.lang="pt-BR";
+            u.rate=0.9;
+            u.pitch=1;
+            u.voice=voice;
+            return u;
+        });
 
-   index = parseInt(localStorage.getItem("audio_"+currentBookName)) || 0;
-   isReading=true;
+        speakingIndex=0;
+        isReading=true;
+        document.getElementById('btn-audio').innerText="⏹ PARAR";
 
-   speakNext();
- });
+        speechSynthesis.cancel();
+        setTimeout(()=>speakQueue(),150);
+    });
 }
 
-// ================= MODO NOTURNO =================
-function toggleNight(){
- document.getElementById('reader').classList.toggle('night');
- localStorage.setItem('night',document.getElementById('reader').classList.contains('night'));
+// ===== LIVRO =====
+async function openBook(url,name){
+    document.getElementById('main-screen').style.display='none';
+    document.getElementById('reader-screen').style.display='flex';
+
+    if(currentBook) currentBook.destroy();
+
+    currentBook = ePub(url);
+
+    rendition = currentBook.renderTo("viewer",{
+        width:"100%",
+        height:"100%",
+        flow:"paginated"
+    });
+
+    // LETRA GRANDE
+    rendition.themes.default({
+        "body": { "padding":"15px" },
+        "p": {
+            "font-size":"36px",
+            "line-height":"1.4",
+            "color":"#000"
+        },
+        "div": { "font-size":"36px" }
+    });
+
+    await rendition.display();
 }
 
-window.onload=()=>{
- if(localStorage.getItem('night')==='true'){
-   document.getElementById('reader').classList.add('night');
- }
-};
+// swipe
+const touchLayer = document.getElementById('touch-layer');
 
-// ================= CLOUD (GitHub) =================
-async function saveCloud(name,pos){
- if(!TOKEN) return;
+touchLayer.addEventListener('touchstart', e=>{
+    startX = e.touches[0].clientX;
+});
 
- const content = btoa(JSON.stringify({pos}));
+touchLayer.addEventListener('touchend', e=>{
+    const diff = startX - e.changedTouches[0].clientX;
+    if(Math.abs(diff)>50){
+        if(diff>0) next();
+        else prev();
+    }
+});
 
- await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/progress_${name}.json`,{
-  method:'PUT',
-  headers:{
-    Authorization:`token ${TOKEN}`,
-    'Content-Type':'application/json'
-  },
-  body:JSON.stringify({
-    message:'save progress',
-    content
-  })
- });
+function next(){
+    speechSynthesis.cancel();
+    rendition.next();
 }
 
-async function loadCloud(name){
- try{
-  const res = await fetch(`https://raw.githubusercontent.com/${USER}/${REPO}/main/progress_${name}.json`);
-  const data = await res.json();
-  return data.pos;
- }catch(e){
-  return null;
- }
+function prev(){
+    speechSynthesis.cancel();
+    rendition.prev();
 }
 
-// ================= FECHAR =================
 function closeReader(){
- speechSynthesis.cancel();
- location.reload();
+    speechSynthesis.cancel();
+    location.reload();
 }
 
-loadBooks();
+// lista github
+async function fetchBooks(){
+    const res = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
+    const files = await res.json();
+
+    const container = document.getElementById('lista-nuvem');
+    files.forEach(f=>{
+        if(f.name.endsWith('.epub')){
+            container.innerHTML += `<div class="item-livro" onclick="openBook('${f.download_url}','${f.name}')">${f.name}</div>`;
+        }
+    });
+}
+
+fetchBooks();
 </script>
 
 </body>
