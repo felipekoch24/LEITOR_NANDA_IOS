@@ -14,7 +14,6 @@
         
         #main-screen { padding: 30px; height: 100vh; overflow-y: auto; }
         header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #ff79c6; padding-bottom: 15px; }
-        .btn-upload { width: 100%; background: #ff79c6; color: #282a36; text-align: center; padding: 25px; border-radius: 15px; font-weight: 900; cursor: pointer; display: block; margin-bottom: 20px; font-size: 20px; border: none; }
         .item-livro { background: #44475a; border-radius: 15px; padding: 20px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-left: 8px solid #ff79c6; font-size: 18px; cursor: pointer; }
 
         #reader-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 1000; flex-direction: column; }
@@ -37,9 +36,7 @@
 
     <div id="main-screen">
         <header><h1>BIBLIOTECA DA NANDA</h1></header>
-        <label for="file-input" class="btn-upload">📂 ABRIR LIVRO DO CELULAR</label>
-        <input type="file" id="file-input" style="display:none" accept=".epub">
-        <div id="lista-nuvem">Carregando livros da nuvem...</div>
+        <div id="lista-nuvem">Carregando acervo...</div>
     </div>
 
     <div id="reader-screen">
@@ -52,7 +49,7 @@
         <div id="viewer"></div>
 
         <div class="footer-nav">
-            <div class="pages-info" id="page-counter">Carregando...</div>
+            <div class="pages-info" id="page-counter">Página -- de --</div>
             <div class="controls">
                 <button class="btn btn-page" onclick="prev()">⬅</button>
                 <button class="btn btn-page" onclick="next()">➡</button>
@@ -65,48 +62,30 @@
         let rendition, currentBook, isReading = false;
         let startX = 0;
 
-        // Função principal para abrir o livro (URL ou ArrayBuffer)
-        async function openBook(data, name) {
+        async function openBook(url, name) {
             document.getElementById('main-screen').style.display = 'none';
             document.getElementById('reader-screen').style.display = 'flex';
             
             if(currentBook) currentBook.destroy();
             
-            // Suporta tanto link do GitHub quanto arquivo local
-            currentBook = ePub(data);
-            
+            currentBook = ePub(url);
             rendition = currentBook.renderTo("viewer", {
                 width: "100%", height: "100%", flow: "paginated", manager: "default", spread: "none"
             });
 
             rendition.themes.default({
-                "body": { "padding": "40px !important" },
+                "body": { "padding": "40px !important", "background": "#1a1a1a !important" },
                 "p": { "font-size": "38px !important", "line-height": "1.5 !important", "color": "#ffffff !important" }
             });
 
             const savedPos = localStorage.getItem('pos_' + name);
             await rendition.display(savedPos || undefined);
 
-            currentBook.ready.then(() => {
-                return currentBook.locations.generate(1000);
-            }).then(() => updateProgress(name));
-
+            currentBook.ready.then(() => currentBook.locations.generate(1000)).then(() => updateProgress(name));
             rendition.on("relocated", () => updateProgress(name));
         }
 
-        // Lógica de Arquivo Local (Celular/Tablet)
-        document.getElementById('file-input').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    openBook(event.target.result, file.name);
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
-
-        // Touch e Navegação
+        // Navegação Touch
         const touchLayer = document.getElementById('touch-layer');
         touchLayer.addEventListener('touchstart', e => startX = e.touches[0].clientX);
         touchLayer.addEventListener('touchend', e => {
@@ -137,20 +116,29 @@
             document.getElementById('btn-audio').innerText = "🔊 OUVIR";
         }
 
+        // --- SISTEMA DE ÁUDIO REPARADO ---
         function toggleAudio() {
             if (isReading) { stopAudio(); return; }
             
             const loc = rendition.currentLocation();
             if (!loc) return;
 
-            // Busca o texto da seção atual
-            currentBook.spine.get(loc.start.cfi).load(currentBook.load.bind(currentBook)).then(doc => {
-                const text = doc.body.innerText || doc.body.textContent;
-                
+            // Pega o texto da página atual via ePub.js (mais seguro que iframe)
+            currentBook.getRange(loc.start.cfi).then(range => {
+                let text = range.toString().trim();
+
+                // Se o range falhar, tenta pegar do capítulo (Spine) como backup
+                if (text.length < 5) {
+                    return currentBook.spine.get(loc.start.cfi).load(currentBook.load.bind(currentBook)).then(doc => {
+                        return doc.body.innerText || doc.body.textContent;
+                    });
+                }
+                return text;
+            }).then(text => {
                 if (text && text.trim().length > 5) {
                     const utter = new SpeechSynthesisUtterance(text.trim());
                     utter.lang = 'pt-BR';
-                    utter.rate = 1.0; 
+                    utter.rate = 1.0;
 
                     utter.onstart = () => {
                         isReading = true;
@@ -160,10 +148,15 @@
                         isReading = false;
                         document.getElementById('btn-audio').innerText = "🔊 OUVIR";
                     };
+
+                    window.speechSynthesis.cancel();
                     window.speechSynthesis.speak(utter);
                 } else {
-                    alert("Não foi possível extrair o texto para áudio.");
+                    alert("Toque na tela ou mude a página para o áudio carregar.");
                 }
+            }).catch(e => {
+                console.error(e);
+                alert("Erro ao carregar áudio. Tente novamente.");
             });
         }
 
