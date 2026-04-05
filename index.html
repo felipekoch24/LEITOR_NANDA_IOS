@@ -37,9 +37,9 @@
 
     <div id="main-screen">
         <header><h1>BIBLIOTECA DA NANDA</h1></header>
-        <label for="file-input" class="btn-upload">📂 ABRIR LIVRO (.EPUB)</label>
+        <label for="file-input" class="btn-upload">📂 ABRIR LIVRO DO CELULAR</label>
         <input type="file" id="file-input" style="display:none" accept=".epub">
-        <div id="lista-nuvem">Buscando seus livros...</div>
+        <div id="lista-nuvem">Carregando livros da nuvem...</div>
     </div>
 
     <div id="reader-screen">
@@ -52,7 +52,7 @@
         <div id="viewer"></div>
 
         <div class="footer-nav">
-            <div class="pages-info" id="page-counter">Página -- de --</div>
+            <div class="pages-info" id="page-counter">Carregando...</div>
             <div class="controls">
                 <button class="btn btn-page" onclick="prev()">⬅</button>
                 <button class="btn btn-page" onclick="next()">➡</button>
@@ -65,19 +65,22 @@
         let rendition, currentBook, isReading = false;
         let startX = 0;
 
-        async function openBook(url, name) {
+        // Função principal para abrir o livro (URL ou ArrayBuffer)
+        async function openBook(data, name) {
             document.getElementById('main-screen').style.display = 'none';
             document.getElementById('reader-screen').style.display = 'flex';
             
             if(currentBook) currentBook.destroy();
             
-            currentBook = ePub(url);
+            // Suporta tanto link do GitHub quanto arquivo local
+            currentBook = ePub(data);
+            
             rendition = currentBook.renderTo("viewer", {
                 width: "100%", height: "100%", flow: "paginated", manager: "default", spread: "none"
             });
 
             rendition.themes.default({
-                "body": { "padding": "40px !important", "background": "#1a1a1a !important" },
+                "body": { "padding": "40px !important" },
                 "p": { "font-size": "38px !important", "line-height": "1.5 !important", "color": "#ffffff !important" }
             });
 
@@ -91,17 +94,19 @@
             rendition.on("relocated", () => updateProgress(name));
         }
 
-        // Abrir arquivo local do dispositivo
+        // Lógica de Arquivo Local (Celular/Tablet)
         document.getElementById('file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
-                reader.onload = (event) => openBook(event.target.result, file.name);
+                reader.onload = function(event) {
+                    openBook(event.target.result, file.name);
+                };
                 reader.readAsArrayBuffer(file);
             }
         });
 
-        // Touch para passar páginas
+        // Touch e Navegação
         const touchLayer = document.getElementById('touch-layer');
         touchLayer.addEventListener('touchstart', e => startX = e.touches[0].clientX);
         touchLayer.addEventListener('touchend', e => {
@@ -132,37 +137,34 @@
             document.getElementById('btn-audio').innerText = "🔊 OUVIR";
         }
 
-        // ÁUDIO REFORÇADO: Lê o que está visível na tela
         function toggleAudio() {
             if (isReading) { stopAudio(); return; }
             
-            // Tenta pegar o texto de dentro do conteúdo renderizado (evita bloqueio de iframe)
-            try {
-                const contents = rendition.getContents();
-                if (contents && contents.length > 0) {
-                    const text = contents[0].document.body.innerText;
-                    
-                    if (text && text.trim().length > 0) {
-                        const utter = new SpeechSynthesisUtterance(text.trim());
-                        utter.lang = 'pt-BR';
-                        utter.rate = 1.0;
+            const loc = rendition.currentLocation();
+            if (!loc) return;
 
-                        utter.onstart = () => {
-                            isReading = true;
-                            document.getElementById('btn-audio').innerText = "⏹ PARAR";
-                        };
-                        utter.onend = () => {
-                            isReading = false;
-                            document.getElementById('btn-audio').innerText = "🔊 OUVIR";
-                        };
-                        window.speechSynthesis.speak(utter);
-                        return;
-                    }
+            // Busca o texto da seção atual
+            currentBook.spine.get(loc.start.cfi).load(currentBook.load.bind(currentBook)).then(doc => {
+                const text = doc.body.innerText || doc.body.textContent;
+                
+                if (text && text.trim().length > 5) {
+                    const utter = new SpeechSynthesisUtterance(text.trim());
+                    utter.lang = 'pt-BR';
+                    utter.rate = 1.0; 
+
+                    utter.onstart = () => {
+                        isReading = true;
+                        document.getElementById('btn-audio').innerText = "⏹ PARAR";
+                    };
+                    utter.onend = () => {
+                        isReading = false;
+                        document.getElementById('btn-audio').innerText = "🔊 OUVIR";
+                    };
+                    window.speechSynthesis.speak(utter);
+                } else {
+                    alert("Não foi possível extrair o texto para áudio.");
                 }
-                alert("Toque na tela antes de ouvir ou mude de página.");
-            } catch (e) {
-                alert("Erro ao ler esta página.");
-            }
+            });
         }
 
         function closeReader() { stopAudio(); location.reload(); }
